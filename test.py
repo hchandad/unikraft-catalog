@@ -68,7 +68,6 @@ def __test_caddy():
         print(e)
 
 
-
 def test_caddy():
     # breakpoint()
     process: subprocess.Popen = subprocess.Popen(
@@ -255,9 +254,9 @@ def run_test(
             print(f"=> kraft command: \n`{command}`")
             print(f"=> kraft stdout:")
             print(f"```\n{stdout.decode()}```")
-            #print("kraft stderr", stderr)
+            # print("kraft stderr", stderr)
     except subprocess.TimeoutExpired:
-        #breakpoint()
+        # breakpoint()
         if ports:
             for port in ports:
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -273,7 +272,7 @@ def run_test(
     except:
         process.kill()
         raise
-    #breakpoint()
+    # breakpoint()
     # check stdout
     if stdout_check:
         if stdout_check.encode() in stdout:
@@ -287,7 +286,7 @@ def run_test(
         else:
             print(f"❌ Check stderr is empty")
     # check return code
-    if return_code: # TODO: fixme
+    if return_code:  # TODO: fixme
         if process.poll() == return_code:
             print(f"✅ Check exit code equals {return_code}")
         else:
@@ -315,6 +314,111 @@ def run_test(
     # TODO: add the ability to do multiple stdout .includes tests
     pass
 
+
+"""
+# spec
+# TODO: apply regex on lines or on full file ? -> on lines
+[
+    # ...
+    # array of test_case object
+    {
+        "arch": "x86_64",
+        "args": {
+            "disable-acceleration": true,
+            "rootfs": "",
+            "volume": ""
+        },
+        "http_check": [
+            # ...
+            # array of http_check object
+            {
+                "uri": "/",
+                "method": "GET",
+                "status_code": 200,
+                "response_check": {
+                    "contains": ["Hello, World!"],
+                    "match": ["... regex"],
+                    "empty": "bool"
+                }
+            }
+        ],
+        "image": "unikraft.org/caddy:2.7",
+        "memory": "512M",
+        "plat": "QEMU",
+        "ports": [
+            # ...
+            # array of tuples
+            [
+                2105,
+                2015
+            ]
+        ],
+        "return_code": {
+            "equals": 0,
+            "not_equal_to": 1,
+            "greater_than": -1
+        },
+        "stderr_check": {
+            "contains": [
+                ""
+            ],
+            "match": [
+                ""
+            ],
+            "empty": true
+        },
+        "stdout_check": {
+            "contains": [
+                "server running",
+                "serving initial configuration"
+            ],
+            "match": "^Powered by Unikraft",
+            "empty": true
+        }
+    }
+]
+"""
+
+# type response_check = dict[str, list[str] |bool] # 3.12
+from typing import TypedDict
+
+t_response_check = TypedDict(
+    "response_check", {"contains": list[str], "match": list[str], "empty": bool}
+)
+t_http_check = TypedDict(
+    "http_check",
+    {"uri": str, "method": str, "status_code": int, "response_check": t_response_check},
+)
+t_return_code = TypedDict(
+    "return_code", {"equals": int, "not_equal_to": int, "greater_than": int}
+)
+t_stdout_check = TypedDict(
+    "stdout_check", {"contains": list[str], "match": list[str], "empty": bool}
+)
+t_stderr_check = TypedDict(
+    "stdout_check", {"contains": list[str], "match": list[str], "empty": bool}
+)
+t_args = TypedDict("args", {"disable-acceleration": bool, "rootfs": str, "volume": str})
+t_port_map = tuple[int, int]
+t_test_case = TypedDict(
+    "test_case",
+    {
+        "arch": Architecture,
+        "args": t_args,
+        "http_check": list[t_http_check],
+        "image": str,
+        "memory": str,
+        "plat": Platforms,
+        "ports": list[t_port_map],
+        "return_code": t_return_code,
+        "stderr_check": t_stderr_check,
+        "stdout_check": t_stdout_check,
+    },
+)
+
+
+def run_test_case(test_case: t_test_case) -> dict["str"]:
+    pass
 
 def run_tests_from_json(fd):
     import json
