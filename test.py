@@ -68,91 +68,6 @@ def __test_caddy():
         print(e)
 
 
-from enum import Enum
-
-
-class Platforms(Enum):
-    QEMU = "qemu"
-
-
-class Architecture(Enum):
-    X86_64 = "x86_64"
-
-
-# TODO: cleanup the process on all exceptions
-# TODO: support the yaml spec
-# TODO: support extra kraft run options ...
-# TODO: use pytest as a library for a better output / traceback
-# TODO: add output
-def run_test(
-    image: str,
-    memory: str,
-    ports: dict[int, int],
-    plat: Platforms,  # switch to enum
-    arch: Architecture,  # switch to enum
-    http_check_uri: str,
-    http_response_check: str,
-    stdout_check: str,
-    stderr_check: bool,  # pass an array of functions that should return true
-    # that are passed the stderr value
-    return_code: int,
-):
-    # breakpoint()
-    ports_arg = ""
-    if ports:
-        ports_arg = "-p" + " ".join([f"{key}:{value}" for key, value in ports.items()])
-    command = f"kraft run --rm -M {memory} {ports_arg} --plat {plat.value} --arch {arch.value} {image}"
-    process: subprocess.Popen = subprocess.Popen(
-        command.split(),
-        close_fds=True,
-        start_new_session=True,
-        stderr=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-    )
-    ports_tcp_check_results = dict()
-    http_check_results = dict()
-    print(f"Testing {image} on {plat.value}/{arch.value}")
-    try:
-        stdout, stderr = process.communicate(timeout=2)
-    except subprocess.TimeoutExpired:
-        if ports:
-            for port in ports:
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                err = s.connect_ex(("localhost", port))
-                ports_tcp_check_results[port] = err
-                s.close()
-                # TODO: assumes all ports are http
-                if http_check_uri:
-                    r = requests.get(f"http://localhost:{port}{http_check_uri}")
-                    http_check_results[port] = r
-        process.terminate()
-        stdout, stderr = process.communicate()
-    except:
-        process.kill()
-        raise
-    # breakpoint()
-    # check stdout
-    assert stdout_check.encode() in stdout
-    # check stderr is empty
-    if stderr_check:
-        assert stderr == b""
-    # check return code
-    if return_code:
-        assert process.poll() == return_code
-    # check tcp
-    for port, errno in ports_tcp_check_results.items():
-        assert errno == 0
-    # check http
-    for port, response in http_check_results.items():
-        assert response.ok == True
-        # TODO:
-        # assert "Hello, World!" in r.text
-        assert http_response_check in response.text
-    # TODO: add the ability to run a bash command
-    # redis-cli/curl/nc that should return 0
-    # TODO: add the ability to do multiple stdout .includes tests
-    pass
-
 
 def test_caddy():
     # breakpoint()
@@ -189,26 +104,6 @@ def test_caddy():
     assert r.ok == True
     assert "Hello, World!" in r.text
     # breakpoint()
-
-
-def run_tests_from_json():
-    import json
-
-    fd = open("tests.json")
-    test_cases = json.load(fd)
-    for test_case in test_cases:
-        run_test(
-            image=test_case["image"],
-            memory=test_case["memory"],
-            ports={p: pi for p, pi in test_case["ports"]},
-            arch=Architecture(test_case["arch"].lower()),
-            plat=Platforms(test_case["plat"].lower()),
-            http_check_uri=test_case["http_check_uri"],
-            http_response_check=test_case["http_response_check"],
-            stdout_check=test_case["stdout_check"],
-            stderr_check=test_case["stderr_check"],
-            return_code=test_case["return_code"],
-        )
 
 
 def run_tests():
@@ -306,5 +201,147 @@ def run_tests():
     )
 
 
+from enum import Enum
+
+
+class Platforms(Enum):
+    QEMU = "qemu"
+
+
+class Architecture(Enum):
+    X86_64 = "x86_64"
+
+
+# TODO: cleanup the process on all exceptions
+# TODO: support the yaml spec
+# TODO: support extra kraft run options ...
+# TODO: use pytest as a library for a better output / traceback
+# TODO: add output
+# TODO: add parsable output (non human)
+# TODO: we can write unit tests by passing specific json objects to run
+#       and checking the error sample output, requires non human output to be done
+def run_test(
+    image: str,
+    memory: str,
+    ports: dict[int, int],
+    plat: Platforms,  # switch to enum
+    arch: Architecture,  # switch to enum
+    http_check_uri: str,
+    http_response_check: str,
+    stdout_check: str,
+    stderr_check: bool,  # pass an array of functions that should return true
+    # that are passed the stderr value
+    return_code: int,
+):
+    # breakpoint()
+    ports_arg = ""
+    if ports:
+        ports_arg = "-p" + " ".join([f"{key}:{value}" for key, value in ports.items()])
+    command = f"kraft run --rm -M {memory} {ports_arg} --plat {plat.value} --arch {arch.value} {image}"
+    process: subprocess.Popen = subprocess.Popen(
+        command.split(),
+        close_fds=True,
+        start_new_session=True,
+        stderr=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+    )
+    ports_tcp_check_results = dict()
+    http_check_results = dict()
+    print(f"Testing {image} on {plat.value}/{arch.value}")
+    try:
+        stdout, stderr = process.communicate(timeout=2)
+        if process.poll() == 1:
+            print(f"❌ Failed to run {image}")
+            print(f"=> kraft command: \n`{command}`")
+            print(f"=> kraft stdout:")
+            print(f"```\n{stdout.decode()}```")
+            #print("kraft stderr", stderr)
+    except subprocess.TimeoutExpired:
+        #breakpoint()
+        if ports:
+            for port in ports:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                err = s.connect_ex(("localhost", port))
+                ports_tcp_check_results[port] = err
+                s.close()
+                # TODO: assumes all ports are http
+                if http_check_uri:
+                    r = requests.get(f"http://localhost:{port}{http_check_uri}")
+                    http_check_results[port] = r
+        process.terminate()
+        stdout, stderr = process.communicate()
+    except:
+        process.kill()
+        raise
+    #breakpoint()
+    # check stdout
+    if stdout_check:
+        if stdout_check.encode() in stdout:
+            print(f"✅ Check '{stdout_check}' in stdout")
+        else:
+            print(f"❌ Check '{stdout_check}' in stdout")
+    # check stderr is empty
+    if stderr_check:
+        if stderr == b"":
+            print(f"✅ Check stderr is empty")
+        else:
+            print(f"❌ Check stderr is empty")
+    # check return code
+    if return_code: # TODO: fixme
+        if process.poll() == return_code:
+            print(f"✅ Check exit code equals {return_code}")
+        else:
+            print(f"❌ Check exit code equals {return_code}, got: {process.poll()}")
+    # check tcp
+    for port, errno in ports_tcp_check_results.items():
+        if errno == 0:
+            print(f"✅ Check tcp port {port} is listening")
+        else:
+            print(f"❌ Check tcp port {port} is listening, got: errno = {errno}")
+    # check http
+    for port, response in http_check_results.items():
+        if response.ok == True:
+            print(f"✅ Check '{response.url}' returns {response.status_code}")
+        else:
+            print(f"❌ Check '{response.url}' returns ok, got: {response.status_code}")
+        # TODO:
+        # assert "Hello, World!" in r.text
+        if http_response_check in response.text:
+            print(f"✅ Check '{http_response_check}' in {response.url}' Body")
+        else:
+            print(f"❌ Check '{http_response_check}' in {response.url}' Body")
+    # TODO: add the ability to run a bash command
+    # redis-cli/curl/nc that should return 0
+    # TODO: add the ability to do multiple stdout .includes tests
+    pass
+
+
+def run_tests_from_json(fd):
+    import json
+
+    test_cases = json.load(fd)
+    for test_case in test_cases:
+        run_test(
+            image=test_case["image"],
+            memory=test_case["memory"],
+            ports={p: pi for p, pi in test_case["ports"]},
+            arch=Architecture(test_case["arch"].lower()),
+            plat=Platforms(test_case["plat"].lower()),
+            http_check_uri=test_case["http_check_uri"],
+            http_response_check=test_case["http_response_check"],
+            stdout_check=test_case["stdout_check"],
+            stderr_check=test_case["stderr_check"],
+            return_code=test_case["return_code"],
+        )
+
+
 if __name__ == "__main__":
-    run_tests_from_json()
+    import argparse
+    import json
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--file", type=argparse.FileType())
+
+    args = parser.parse_args()
+    if args.file:
+        run_tests_from_json(args.file)

@@ -62,10 +62,10 @@
     {
         "image": "unikraft.org/memcached:1.6",
         "memory": "512M",
-        "ports": [[2105, 112111]],
+        "ports": [[2105, 11211]],
         "arch": "x86_64",
         "plat": "QEMU",
-        "http_check_uri": "/",
+        "http_check_uri": "",
         "http_response_check": "",
         "stdout_check": "",
         "stderr_check": true,
