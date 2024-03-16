@@ -1,0 +1,86 @@
+[
+    {
+        "image": "unikraft.org/helloworld:latest",
+        "memory": "512M",
+        "ports": {},
+        "arch": "x86_64",
+        "plat": "QEMU",
+        "http_check_uri": "",
+        "http_response_check": "",
+        "stdout_check": "Hello from Unikraft!",
+        "stderr_check": true,
+        "return_code": 0
+    },
+    {
+        "image": "unikraft.org/base:latest",
+        "memory": "512M",
+        "ports": {},
+        "arch": "x86_64",
+        "plat": "QEMU",
+        "http_check_uri": "",
+        "http_response_check": "",
+        "stdout_check": "Hello from Unikraft!",
+        "stderr_check": true,
+        "return_code": 0
+    },
+    {
+        "image": "unikraft.org/caddy:2.7",
+        "memory": "512M",
+        "ports": [[2105, 2015]],
+        "arch": "x86_64",
+        "plat": "QEMU",
+        "http_check_uri": "/",
+        "http_response_check": "Hello, World!",
+        "stdout_check": "serving initial configuration",
+        "stderr_check": true,
+        "return_code": 0
+    },
+    {
+        "image": "unikraft.org/lua:5.4.4",
+        "memory": "512M",
+        "ports": [[2105, 8080]],
+        "arch": "x86_64",
+        "plat": "QEMU",
+        "http_check_uri": "/",
+        "http_response_check": "Hello, World!",
+        "stdout_check": "",
+        "stderr_check": true,
+        "return_code": 0
+    },
+    {
+        "image": "unikraft.org/nginx:1.25",
+        "memory": "512M",
+        "ports": [[2105, 80]],
+        "arch": "x86_64",
+        "plat": "QEMU",
+        "http_check_uri": "/",
+        "http_response_check": "<h1>Welcome to nginx!</h1>",
+        "stdout_check": "",
+        "stderr_check": true,
+        "return_code": 0
+    },
+    {
+        "image": "unikraft.org/memcached:1.6",
+        "memory": "512M",
+        "ports": [[2105, 112111]],
+        "arch": "x86_64",
+        "plat": "QEMU",
+        "http_check_uri": "/",
+        "http_response_check": "",
+        "stdout_check": "",
+        "stderr_check": true,
+        "return_code": 0
+    },
+    {
+        "image": "unikraft.org/redis:7.2",
+        "memory": "512M",
+        "ports": [[2105, 6379]],
+        "arch": "x86_64",
+        "plat": "QEMU",
+        "http_check_uri": "",
+        "http_response_check": "",
+        "stdout_check": "Ready to accept connections tcp",
+        "stderr_check": true,
+        "return_code": 0
+    }
+]
