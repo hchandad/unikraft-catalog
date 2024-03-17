@@ -5,10 +5,12 @@ from enum import Enum
 
 PORT = 2105
 
+
 class Platforms(Enum):
     QEMU = "qemu"
     FIRECRACKER = "fc"
     XEN = "xen"
+
 
 class Architecture(Enum):
     X86_64 = "x86_64"
@@ -42,6 +44,7 @@ class Architecture(Enum):
                 "uri": "/",
                 "method": "GET",
                 "status_code": 200,
+                "port": 2105,
                 "response_check": {
                     "contains": ["Hello, World!"],
                     "match": ["... regex"],
@@ -94,7 +97,13 @@ t_response_check = TypedDict(
 )
 t_http_check = TypedDict(
     "http_check",
-    {"uri": str, "method": str, "status_code": int, "response_check": t_response_check},
+    {
+        "uri": str,
+        "method": str,
+        "port": int,
+        "status_code": int,
+        "response_check": t_response_check,
+    },
 )
 t_return_code = TypedDict(
     "return_code", {"equals": int, "not_equal_to": int, "greater_than": int}
