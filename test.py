@@ -417,8 +417,161 @@ t_test_case = TypedDict(
 )
 
 
+# TODO: unit test the command generation from the spec
+# TODO: should we support multiple volumes bind mount ? as an array
+# TODO: write a runtime spec checker based on the typing definitions
+# TODO: should add the timeout to the test_case with a sane default
+# TODO: switch to yaml
+# TODO: supporting all http methods, requires providing other args to pass body params
+#       for post/patch etc ..., current implementation works for get,head,options
+# TODO: define the behavior when missing arguments
 def run_test_case(test_case: t_test_case) -> dict["str"]:
-    pass
+    ports = test_case["ports"]
+    ports_arg = ""
+    if test_case["ports"]:
+        ports_arg = "-p" + " ".join(
+            [f"{published}:{internal}" for published, internal in ports]
+        )
+    args = []
+    for arg_name, arg_value in test_case["args"].items():
+        if arg_value:
+            if type(arg_value) is bool:
+                args.append(f"--{arg_name}")
+            else:
+                args.append(f"--{arg_name} {arg_value}")
+    command = (
+        f"kraft run --rm -M {test_case['memory']} {ports_arg} --plat {test_case['plat'].value}"
+        f" {' '.join(args)} --arch {test_case['arch'].value} {test_case['image']}"
+    )
+    print(
+        f"Testing {test_case['image']} on {test_case['plat'].value}/{test_case['arch'].value}"
+    )
+    print(f"=> kraft command: \n`{command}`")
+    # TODO: ...
+    process: subprocess.Popen = subprocess.Popen(
+        command.split(),
+        close_fds=True,
+        start_new_session=True,
+        stderr=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+    )
+    ports_tcp_check_results = dict()
+    http_check_results = dict()
+    try:
+        stdout, stderr = process.communicate(timeout=2)
+        if process.poll() == 1:
+            print(f"❌ Failed to run {test_case['image']}")
+            print(f"=> kraft stdout:")
+            print(f"```\n{stdout.decode()}```")
+
+    except subprocess.TimeoutExpired:
+        if ports:
+            for port, _ in ports:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                err = s.connect_ex(("localhost", port))
+                ports_tcp_check_results[port] = err
+                s.close()
+        for http_check in test_case["http_check"]:
+            # TODO: assumes all ports are http # Fixed
+            # r = requests.get(f"http://localhost:{port}{http_check['uri']}") # <- wrong port
+            r = requests.request(
+                method=http_check["method"],
+                url=f"http://localhost:{http_check['port']}{http_check['uri']}",
+            )
+            http_check["result"] = r
+        process.terminate()
+        stdout, stderr = process.communicate()
+    except:
+        process.kill()
+        raise
+    # breakpoint()
+    if test_case["stdout_check"]:
+        print("=> stdout_check:")
+        if "contains" in test_case["stdout_check"]:
+            for substr in test_case["stdout_check"]["contains"]:
+                if substr.encode() in stdout:
+                    print(f"✅ Check '{substr}' in stdout")
+                else:
+                    print(f"❌ Check '{substr}' in stdout")
+        # TODO: match
+        if "empty" in test_case["stdout_check"]:
+            if stdout == b"":
+                print(f"✅ Check stdout is empty")
+            else:
+                print(f"❌ Check stdout is empty")
+    if test_case["stderr_check"]:
+        print("=> stderr_check:")
+        if "contains" in test_case["stderr_check"]:
+            for substr in test_case["stderr_check"]["contains"]:
+                if substr.encode() in stderr:
+                    print(f"✅ Check '{substr}' in stderr")
+                else:
+                    print(f"❌ Check '{substr}' in stderr")
+        # TODO: match
+        if "empty" in test_case["stderr_check"]:
+            if stderr == b"":
+                print(f"✅ Check stderr is empty")
+            else:
+                print(f"❌ Check stderr is empty")
+    if test_case["return_code"]:
+        print("=> return_code:")
+        if "equals" in test_case["return_code"]:
+            if process.poll() == test_case["return_code"]["equals"]:
+                print(f"✅ Check exit code equals {test_case['return_code']['equals']}")
+            else:
+                print(
+                    f"❌ Check exit code equals {test_case['return_code']['equals']}, got: {process.poll()}"
+                )
+        if "not_equal_to" in test_case["return_code"]:
+            if process.poll() == test_case["return_code"]["not_equal_to"]:
+                print(
+                    f"❌ Check exit code not equal to {test_case['return_code']['not_equal_to']}"
+                )
+            else:
+                print(
+                    f"✅ Check exit code not equal to {test_case['return_code']['not_equal_to']}"
+                )
+        if "greater_than" in test_case["return_code"]:
+            if process.poll() > test_case["return_code"]["greater_than"]:
+                print(
+                    f"✅ Check exit code greater than {test_case['return_code']['greater_than']}"
+                )
+            else:
+                print(
+                    f"❌ Check exit code greater than {test_case['return_code']['greater_than']}, got: {process.poll()}"
+                )
+    # check tcp
+    if ports_tcp_check_results:
+        print("=> tcp_check:")
+        for port, errno in ports_tcp_check_results.items():
+            if errno == 0:
+                print(f"✅ Check tcp port {port} is listening")
+            else:
+                print(f"❌ Check tcp port {port} is listening, got: errno = {errno}")
+    if test_case["http_check"]:
+        print("=> http_check:")
+        for http_check in test_case["http_check"]:
+            response = http_check["result"]
+            if response.status_code == http_check["status_code"]:
+                print(f"✅ Check '{response.url}' returns {response.status_code}")
+            else:
+                print(
+                    f"❌ Check '{response.url}' returns ok, got: {response.status_code}"
+                )
+            if "response_check" in http_check:
+                if "contains" in http_check["response_check"]:
+                    for substr in http_check["response_check"]["contains"]:
+                        if substr in response.text:
+                            print(f"✅ Check '{substr}' in '{response.url}' Body")
+                        else:
+                            print(f"❌ Check '{substr}' in '{response.url}' Body")
+                # TODO: match
+                if "empty" in http_check["response_check"]:
+                    if response.text == "":
+                        print(f"✅ Check '{response.url}' body is empty")
+                    else:
+                        print(f"❌ Check '{response.url}' body is empty")
+
 
 def run_tests_from_json(fd):
     import json
@@ -448,4 +601,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     if args.file:
-        run_tests_from_json(args.file)
+        # run_tests_from_json(args.file)
+        test_cases: list[t_test_case] = json.load(args.file)
+        for test_case in test_cases:
+            test_case["arch"] = Architecture(test_case["arch"].lower())
+            test_case["plat"] = Platforms(test_case["plat"].lower())
+            run_test_case(test_case)
