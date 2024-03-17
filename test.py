@@ -1,6 +1,7 @@
 import subprocess
 import socket
 import requests
+import errno
 from enum import Enum
 
 PORT = 2105
@@ -141,6 +142,8 @@ t_test_case = TypedDict(
 # TODO: supporting all http methods, requires providing other args to pass body params
 #       for post/patch etc ..., current implementation works for get,head,options
 # TODO: define the behavior when missing arguments
+# TODO: print stdout when exit code is not what is expected
+# TODO: show human readable errno descriptions
 def run_test_case(test_case: t_test_case) -> dict["str"]:
     ports = test_case["ports"]
     ports_arg = ""
@@ -180,6 +183,8 @@ def run_test_case(test_case: t_test_case) -> dict["str"]:
             print(f"```\n{stdout.decode()}```")
 
     except subprocess.TimeoutExpired:
+        # BUG: if the process fails, but takes during initialization longer than `timeout`
+        # for example in the case of `pull`
         if ports:
             for port, _ in ports:
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -189,13 +194,20 @@ def run_test_case(test_case: t_test_case) -> dict["str"]:
         for http_check in test_case["http_check"]:
             # TODO: assumes all ports are http # Fixed
             # r = requests.get(f"http://localhost:{port}{http_check['uri']}") # <- wrong port
-            r = requests.request(
-                method=http_check["method"],
-                url=f"http://localhost:{http_check['port']}{http_check['uri']}",
-            )
-            http_check["result"] = r
+            try:
+                r = requests.request(
+                    method=http_check["method"],
+                    url=f"http://localhost:{http_check['port']}{http_check['uri']}",
+                )
+                http_check["result"] = r
+            except requests.ConnectionError as e:
+                http_check["error"] = e
         process.terminate()
         stdout, stderr = process.communicate()
+        if process.poll() == 1:
+            print(f"❌ Failed to run {test_case['image']}")
+            print(f"=> kraft stdout:")
+            print(f"```\n{stdout.decode()}```")
     except:
         process.kill()
         raise
@@ -237,6 +249,7 @@ def run_test_case(test_case: t_test_case) -> dict["str"]:
                 print(
                     f"❌ Check exit code equals {test_case['return_code']['equals']}, got: {process.poll()}"
                 )
+
         if "not_equal_to" in test_case["return_code"]:
             if process.poll() == test_case["return_code"]["not_equal_to"]:
                 print(
@@ -258,14 +271,21 @@ def run_test_case(test_case: t_test_case) -> dict["str"]:
     # check tcp
     if ports_tcp_check_results:
         print("=> tcp_check:")
-        for port, errno in ports_tcp_check_results.items():
-            if errno == 0:
+        for port, err in ports_tcp_check_results.items():
+            if err == 0:
                 print(f"✅ Check tcp port {port} is listening")
             else:
-                print(f"❌ Check tcp port {port} is listening, got: errno = {errno}")
+                print(
+                    f"❌ Check tcp port {port} is listening, got: errno = {err} ({errno.errorcode[err]})"
+                )
     if test_case["http_check"]:
         print("=> http_check:")
         for http_check in test_case["http_check"]:
+            if "error" in http_check:
+                print(
+                    f"❌ Check '{http_check['uri']}' failed with error {http_check['error']}"
+                )
+                continue
             response = http_check["result"]
             if response.status_code == http_check["status_code"]:
                 print(f"✅ Check '{response.url}' returns {response.status_code}")
