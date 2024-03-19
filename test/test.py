@@ -333,11 +333,16 @@ if __name__ == "__main__":
     import json
     import yaml
 
-    yaml.warnings({"YAMLLoadWarning": False})
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--file", type=argparse.FileType())
-    parser.add_argument("--filter", type=str, nargs="+")
+    parser = argparse.ArgumentParser(description="Unikraft image test runner")
+    parser.add_argument(
+        "--file", type=argparse.FileType(), help="a yaml or json test definition file"
+    )
+    parser.add_argument(
+        "--filter",
+        type=str,
+        nargs="+",
+        help="filter the test cases to run e.g plat=qemu image=unikraft.org/lua:5.4.4",
+    )
 
     args = parser.parse_args()
     if args.file:
