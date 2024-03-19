@@ -115,7 +115,9 @@ t_stdout_check = TypedDict(
 t_stderr_check = TypedDict(
     "stdout_check", {"contains": list[str], "match": list[str], "empty": bool}
 )
-t_args = TypedDict("args", {"disable-acceleration": bool, "rootfs": str, "volume": str})
+t_args = TypedDict(
+    "args", {"disable-acceleration": bool, "rootfs": str, "volume": str, "memory": str}
+)
 t_port_map = tuple[int, int]
 t_test_case = TypedDict(
     "test_case",
@@ -145,22 +147,32 @@ t_test_case = TypedDict(
 # TODO: define the behavior when missing arguments
 # TODO: print stdout when exit code is not what is expected
 # TODO: show human readable errno descriptions
+# TODO: in the case where kraft hangs, or fails with open subprocesses
+#       we should track / register the names of vm's launched and remove them using the
+#       kraft remove command, we need to do this if we do `process.kill()` where it seems
+#       killing the main kraft process without sigterm can leave the launched vms open
+#       due to not allowing it to do a graceful shutdown, the vms are removed since
+#       we pass the `--rm` option when launching. e.i if we want to use SIGKILL we should
+#       clean the launched vms by keeping track of their ids, and removing em manually.
 def run_test_case(test_case: t_test_case) -> dict["str"]:
-    ports = test_case["ports"]
     ports_arg = ""
-    if test_case["ports"]:
-        ports_arg = "-p" + " ".join(
-            [f"{published}:{internal}" for published, internal in ports]
-        )
+    ports = []
+    if "ports" in test_case:
+        ports = test_case["ports"]
+        if test_case["ports"]:
+            ports_arg = "-p" + " ".join(
+                [f"{published}:{internal}" for published, internal in ports]
+            )
     args = []
-    for arg_name, arg_value in test_case["args"].items():
-        if arg_value:
-            if type(arg_value) is bool:
-                args.append(f"--{arg_name}")
-            else:
-                args.append(f"--{arg_name} {arg_value}")
+    if "args" in test_case:
+        for arg_name, arg_value in test_case["args"].items():
+            if arg_value:
+                if type(arg_value) is bool:
+                    args.append(f"--{arg_name}")
+                else:
+                    args.append(f"--{arg_name} {arg_value}")
     command = (
-        f"kraft run --rm -M {test_case['memory']} {ports_arg} --plat {test_case['plat'].value}"
+        f"kraft run --rm {ports_arg} --plat {test_case['plat'].value}"
         f" {' '.join(args)} --arch {test_case['arch'].value} {test_case['image']}"
     )
     print(
@@ -196,17 +208,19 @@ def run_test_case(test_case: t_test_case) -> dict["str"]:
                 err = s.connect_ex(("localhost", port))
                 ports_tcp_check_results[port] = err
                 s.close()
-        for http_check in test_case["http_check"]:
-            # TODO: assumes all ports are http # Fixed
-            # r = requests.get(f"http://localhost:{port}{http_check['uri']}") # <- wrong port
-            try:
-                r = requests.request(
-                    method=http_check["method"],
-                    url=f"http://localhost:{http_check['port']}{http_check['uri']}",
-                )
-                http_check["result"] = r
-            except requests.ConnectionError as e:
-                http_check["error"] = e
+        if "http_check" in test_case:
+            # breakpoint()
+            for http_check in test_case["http_check"]:
+                # TODO: assumes all ports are http # Fixed
+                # r = requests.get(f"http://localhost:{port}{http_check['uri']}") # <- wrong port
+                try:
+                    r = requests.request(
+                        method=http_check["method"],
+                        url=f"http://localhost:{http_check['port']}{http_check['uri']}",
+                    )
+                    http_check["result"] = r
+                except requests.ConnectionError as e:
+                    http_check["error"] = e
         process.terminate()
         stdout, stderr = process.communicate()
         if process.poll() == 1:
@@ -217,7 +231,7 @@ def run_test_case(test_case: t_test_case) -> dict["str"]:
         process.kill()
         raise
     # breakpoint()
-    if test_case["stdout_check"]:
+    if "stdout_check" in test_case:
         print("=> stdout_check:")
         if "contains" in test_case["stdout_check"]:
             for substr in test_case["stdout_check"]["contains"]:
@@ -231,7 +245,7 @@ def run_test_case(test_case: t_test_case) -> dict["str"]:
                 print(f"✅ Check stdout is empty")
             else:
                 print(f"❌ Check stdout is empty")
-    if test_case["stderr_check"]:
+    if "stderr_check" in test_case:
         print("=> stderr_check:")
         if "contains" in test_case["stderr_check"]:
             for substr in test_case["stderr_check"]["contains"]:
@@ -245,7 +259,7 @@ def run_test_case(test_case: t_test_case) -> dict["str"]:
                 print(f"✅ Check stderr is empty")
             else:
                 print(f"❌ Check stderr is empty")
-    if test_case["return_code"]:
+    if "return_code" in test_case:
         print("=> return_code:")
         if "equals" in test_case["return_code"]:
             if process.poll() == test_case["return_code"]["equals"]:
@@ -283,7 +297,8 @@ def run_test_case(test_case: t_test_case) -> dict["str"]:
                 print(
                     f"❌ Check tcp port {port} is listening, got: errno = {err} ({errno.errorcode[err]})"
                 )
-    if test_case["http_check"]:
+    # breakpoint()
+    if "http_check" in test_case:
         print("=> http_check:")
         for http_check in test_case["http_check"]:
             if "error" in http_check:
