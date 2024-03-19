@@ -1,0 +1,25 @@
+# unikraft.org/lua:5.4.4
+- arch: x86_64
+  plat: qemu
+  image: unikraft.org/lua:5.4.4
+  args:
+    memory: 512M
+  ports:
+    - [2105, 8080]
+  http_check:
+  - method: GET
+    uri: '/'
+    port: 2105
+    status_code: 200
+    response_check:
+      contains:
+        - Hello, World!
+  return_code:
+    equals: 0
+  stderr_check:
+    empty: true
+  stdout_check:
+    contains:
+      - Powered by Unikraft
+      - Now listening on port 8080
+      - GET /

@@ -1,0 +1,62 @@
+[
+    {
+        "arch": "x86_64",
+        "args": {
+            "memory": "512M",
+            "disable-acceleration": false,
+            "rootfs": "",
+            "volume": ""
+        },
+        "http_check": [
+            {
+                "method": "GET",
+                "port": 2105,
+                "response_check": {
+                    "contains": [
+                        "Hello, World!"
+                    ],
+                    "empty": true,
+                    "match": [
+                        "... regex"
+                    ]
+                },
+                "status_code": 200,
+                "uri": "/"
+            },
+            {
+                "method": "options",
+                "port": 2105,
+                "status_code": 200,
+                "uri": "/404"
+            }
+        ],
+        "image": "unikraft.org/caddy:2.7",
+        "plat": "QEMU",
+        "ports": [
+            [
+                2105,
+                2015
+            ]
+        ],
+        "return_code": {
+            "equals": 0,
+            "greater_than": -1,
+            "not_equal_to": 1
+        },
+        "stderr_check": {
+            "contains": [],
+            "empty": true,
+            "match": [
+                ""
+            ]
+        },
+        "stdout_check": {
+            "contains": [
+                "server running",
+                "serving initial configuration"
+            ],
+            "empty": true,
+            "match": "^Powered by Unikraft"
+        }
+    }
+]
