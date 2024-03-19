@@ -333,15 +333,19 @@ if __name__ == "__main__":
     import json
     import yaml
 
+    yaml.warnings({"YAMLLoadWarning": False})
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--file", type=argparse.FileType())
     parser.add_argument("--filter", type=str, nargs="+")
 
     args = parser.parse_args()
     if args.file:
-        loader = json
+        test_cases: list[t_test_case] = []
         if args.file.name.endswith(".yaml"):
-            loader = yaml
+            test_cases = yaml.load(args.file, Loader=yaml.FullLoader)
+        else:
+            test_cases = json.load(args.file)
         filters = []
         if args.filter:
             filters = [s.split("=") for s in args.filter]
@@ -354,7 +358,6 @@ if __name__ == "__main__":
                     return False
             return True
 
-        test_cases: list[t_test_case] = loader.load(args.file)
         for test_case in filter(f, test_cases):
             test_case["arch"] = Architecture(test_case["arch"].lower())
             test_case["plat"] = Platforms(test_case["plat"].lower())
