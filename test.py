@@ -331,14 +331,40 @@ def run_test_case(test_case: t_test_case) -> dict["str"]:
 if __name__ == "__main__":
     import argparse
     import json
+    import yaml
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--file", type=argparse.FileType())
+    parser.add_argument("--filter", type=str, nargs="+")
 
     args = parser.parse_args()
     if args.file:
-        test_cases: list[t_test_case] = json.load(args.file)
-        for test_case in test_cases:
+        loader = json
+        if args.file.name.endswith(".yaml"):
+            loader = yaml
+        filters = []
+        if args.filter:
+            filters = [s.split("=") for s in args.filter]
+
+        # breakpoint()
+        def f(t):
+            # breakpoint()
+            for key, value in filters:
+                if (key not in t) or (t[key] != value):
+                    return False
+            return True
+
+        test_cases: list[t_test_case] = loader.load(args.file)
+        for test_case in filter(f, test_cases):
             test_case["arch"] = Architecture(test_case["arch"].lower())
             test_case["plat"] = Platforms(test_case["plat"].lower())
-            run_test_case(test_case)
+            try:
+                run_test_case(test_case)
+            except:
+                print(test_case)
+                raise
+
+    # TODO: add some general filtering of testcase's
+    #       for example running just a specific architecture
+    #       or a specific image
+    # TODO: extract the targets from the kraftfile
