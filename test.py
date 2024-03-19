@@ -130,6 +130,7 @@ t_test_case = TypedDict(
         "return_code": t_return_code,
         "stderr_check": t_stderr_check,
         "stdout_check": t_stdout_check,
+        "timeout": int,
     },
 )
 
@@ -174,9 +175,13 @@ def run_test_case(test_case: t_test_case) -> dict["str"]:
         stderr=subprocess.PIPE,
         stdout=subprocess.PIPE,
     )
+    timeout = 2
+    if "timeout" in test_case:
+        timeout = test_case["timeout"]
+    print(f"=> pid: {process.pid}")
     ports_tcp_check_results = dict()
     try:
-        stdout, stderr = process.communicate(timeout=2)
+        stdout, stderr = process.communicate(timeout=timeout)
         if process.poll() == 1:
             print(f"❌ Failed to run {test_case['image']}")
             print(f"=> kraft stdout:")
