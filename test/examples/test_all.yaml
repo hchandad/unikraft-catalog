@@ -63,6 +63,7 @@
     uri: /404
   image: unikraft.org/caddy:2.7
   plat: fc
+  timeout: 10
   ports:
   - - 2105
     - 2015
@@ -85,6 +86,7 @@
 - arch: x86_64
   image: unikraft.org/base
   plat: fc
+  timeout: 10
   return_code:
     equals: 0
   stdout_check:
@@ -117,6 +119,7 @@
       - Hello from Unikraft!
 - arch: x86_64
   plat: fc
+  timeout: 10
   image: unikraft.org/helloworld:latest
   return_code:
     equals: 0
@@ -152,8 +155,8 @@
       - GET /
 - arch: x86_64
   plat: fc
-  image: unikraft.org/lua:5.4.4
   timeout: 10
+  image: unikraft.org/lua:5.4.4
   args:
     memory: 512M
   ports:
@@ -175,5 +178,51 @@
       - Powered by Unikraft
       - Now listening on port 8080
       - GET /
-
-
+# unikraft.org/lua:5.4
+- arch: x86_64
+  plat: qemu
+  image: unikraft.org/lua:5.4
+  return_code:
+    equals: 0
+  stderr_check:
+    empty: true
+  stdout_check:
+    contains:
+      - Hello, World!
+- arch: arm64
+  timeout: 10
+  plat: qemu
+  image: unikraft.org/lua:5.4
+  return_code:
+    equals: 0
+  stderr_check:
+    empty: true
+  stdout_check:
+    contains:
+      - Hello, World!
+- arch: x86_64
+  plat: fc
+  timeout: 10
+  image: unikraft.org/lua:5.4
+  args:
+    memory: 512M
+  return_code:
+    equals: 0
+  stderr_check:
+    empty: true
+  stdout_check:
+    contains:
+      - Hello, World!
+- arch: arm64
+  plat: fc
+  timeout: 10
+  image: unikraft.org/lua:5.4
+  args:
+    memory: 512M
+  return_code:
+    equals: 0
+  stderr_check:
+    empty: true
+  stdout_check:
+    contains:
+      - Hello, World!

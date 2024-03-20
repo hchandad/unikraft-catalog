@@ -15,6 +15,7 @@ class Platforms(Enum):
 
 class Architecture(Enum):
     X86_64 = "x86_64"
+    ARM64 = "arm64"
 
 
 # TODO: cleanup the process on all exceptions
@@ -24,6 +25,12 @@ class Architecture(Enum):
 # TODO: add parsable output (non human)
 # TODO: we can write unit tests by passing specific json objects to run
 #       and checking the error sample output, requires non human output to be done
+# TODO: add the ability to specify the arch/plat both as a tuple in an array to run multiple
+#       architectures/plats, and as a single key: value for a single platform/arch
+# TODO: run image or accept a build: path/to/kraftfile argument
+#       build:
+#           args: ...
+#           dir: .
 
 """
 # spec
@@ -202,6 +209,8 @@ def run_test_case(test_case: t_test_case) -> dict["str"]:
     except subprocess.TimeoutExpired:
         # BUG: if the process fails, but takes during initialization longer than `timeout`
         # for example in the case of `pull`
+        # BUG: if the process exists early, successfully e.i (not a daemon)
+        # and the spec defines network checks, it would cause undefined behavior
         if ports:
             for port, _ in ports:
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -306,27 +315,29 @@ def run_test_case(test_case: t_test_case) -> dict["str"]:
                     f"❌ Check '{http_check['uri']}' failed with error {http_check['error']}"
                 )
                 continue
-            response = http_check["result"]
-            if response.status_code == http_check["status_code"]:
-                print(f"✅ Check '{response.url}' returns {response.status_code}")
-            else:
-                print(
-                    f"❌ Check '{response.url}' returns ok, got: {response.status_code}"
-                )
-            if "response_check" in http_check:
-                if "contains" in http_check["response_check"]:
-                    for substr in http_check["response_check"]["contains"]:
-                        if substr in response.text:
-                            print(f"✅ Check '{substr}' in '{response.url}' Body")
+            elif "result" in http_check:
+                response = http_check["result"]
+                if response.status_code == http_check["status_code"]:
+                    print(f"✅ Check '{response.url}' returns {response.status_code}")
+                else:
+                    print(
+                        f"❌ Check '{response.url}' returns ok, got: {response.status_code}"
+                    )
+                if "response_check" in http_check:
+                    if "contains" in http_check["response_check"]:
+                        for substr in http_check["response_check"]["contains"]:
+                            if substr in response.text:
+                                print(f"✅ Check '{substr}' in '{response.url}' Body")
+                            else:
+                                print(f"❌ Check '{substr}' in '{response.url}' Body")
+                    # TODO: match
+                    if "empty" in http_check["response_check"]:
+                        if response.text == "":
+                            print(f"✅ Check '{response.url}' body is empty")
                         else:
-                            print(f"❌ Check '{substr}' in '{response.url}' Body")
-                # TODO: match
-                if "empty" in http_check["response_check"]:
-                    if response.text == "":
-                        print(f"✅ Check '{response.url}' body is empty")
-                    else:
-                        print(f"❌ Check '{response.url}' body is empty")
-
+                            print(f"❌ Check '{response.url}' body is empty")
+            else:
+                print(f"❌ Check `{http_check['uri']}` was not run, vm exited too early.")
 
 if __name__ == "__main__":
     import argparse
